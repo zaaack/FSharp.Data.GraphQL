@@ -6,6 +6,7 @@ namespace FSharp.Data.GraphQL.Client
 open System
 open System.IO
 open System.Net
+open ProviderImplementation
 open ProviderImplementation.ProvidedTypes
 open Microsoft.FSharp.Core.CompilerServices
 
@@ -53,7 +54,7 @@ module Util =
                 return Choice2Of2 errors
         }
 
-    let compileTypesFromSchema asm ns (schema: IntrospectionSchema) = 
+    let compileTypesFromSchema asm ns (schema: IntrospectionSchema) =
         let underlyingType (t: TypeReference) =
             t.UnderlyingType
         let ctx = {
@@ -65,7 +66,7 @@ module Util =
             ||> Array.fold (fun acc t ->
                 if acc.ContainsKey t.Name
                 then acc
-                else Map.add t.Name (ProvidedType (initType ctx t, t)) acc) 
+                else Map.add t.Name (ProvidedType (initType ctx t, t)) acc)
         let defctx = { ctx with KnownTypes = typeDefinitions }
         typeDefinitions
         |> Seq.iter (fun kv ->
@@ -127,7 +128,7 @@ module Util =
                             (%%makeExprArray (List.take argsLength argValues): obj[])
                             |> buildQuery opField (extractFields (%%Expr.Coerce(List.last argValues, typeof<Expr>))) argNames
                             |> launchRequest serverUrl opName opField Option.ofObj
-                        @@>                      
+                        @@>
                 else
                     fun argValues ->
                         <@@
@@ -160,20 +161,20 @@ module Util =
         | _ -> ()
 
 type internal ProviderSchemaConfig =
-    { Namespace: string 
+    { Namespace: string
       DefinedTypes: Map<string, ProvidedTypeDefinition option> }
 
 [<TypeProvider>]
 type GraphQlProvider (config : TypeProviderConfig) as this =
     inherit TypeProviderForNamespaces ()
-
+    let ctxt = ProvidedTypesContext.Create(config)
     let asm = System.Reflection.Assembly.GetExecutingAssembly()
 
     do
         let ns = "FSharp.Data.GraphQL"
         let generator = ProvidedTypeDefinition(asm, ns, "GraphQLProvider", Some typeof<obj>)
         generator.DefineStaticParameters([ProvidedStaticParameter("url", typeof<string>)], fun typeName parameterValues ->
-            match parameterValues with 
+            match parameterValues with
             | [| :? string as serverUrl|] ->
                 let choice = Util.requestSchema(serverUrl) |> Async.RunSynchronously
                 match choice with
